@@ -1,0 +1,176 @@
+#!/usr/bin/env bash
+
+# This is vircs.
+#
+# Vircs is a simple wrapper around `rcs ci', `rcs co' and a text editor; this is
+# probably the millionth of its kind.
+
+# For more info, see
+# https://www.ohreally.nl/2019/03/31/version-control-for-configuration-files/
+
+################################################################################
+
+# Copyright (c) 2018 Rob La Lau <rob@ohreally.nl>
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+################################################################################
+
+# Dependencies.
+RCS=`which rcs`		|| exit 1
+CI="${RCS} ci"
+CO="${RCS} co"
+DIFF="${RCS} diff"
+CLEAN="${RCS} clean"
+CHGRP=`which chgrp`	|| exit 1
+CHMOD=`which chmod`	|| exit 1
+CHOWN=`which chown`	|| exit 1
+FILE=`which file`	|| exit 1
+RM=`which rm`		|| exit 1
+STAT=`which stat`	|| exit 1
+[ -z "${EDITOR}" ] && {
+	# Real sysadmins use vim. ;)
+	echo "Environment variable EDITOR not set; we'll use vim."
+	EDITOR=`which vim` || exit 1
+}
+
+# File to edit.
+file=$@
+[ -z "${file}" ] && {
+	echo "Usage: $0 file"
+	exit 1
+}
+
+# File exists?
+[ ! -e "${file}" ] && {
+	echo "File ${file} does not exist. Please create it before continuing."
+	echo "If an RCS file exists, you can (re)create the original by executing"
+	echo " ${CO} -u ${file},v"
+	echo "Remember to set the correct permissions using 'chown', 'chgrp' and 'chmod'."
+	exit 1
+}
+
+# Bail out if file ends in ',v'.
+[ "${file##*,}" = "v" ] && {
+	echo "You specified the RCS file. Please specify the working file."
+	echo "If you do not have a working file, you can (re)create it by executing"
+	echo " ${CO} -u ${file}"
+	echo "Remember to set the correct permissions using 'chown', 'chgrp' and 'chmod'."
+	exit 1
+}
+
+# Acceptable mime type?
+mimetype=`"${FILE}" --brief --dereference --mime-type "${file}"`
+[ "${mimetype%%/*}" != "text" -a "${mimetype}" != "inode/x-empty" ] && {
+	echo "File ${file} is of type ${mimetype} and cannot be edited by $0."
+	exit 1
+}
+
+# RCS ignores file owner, group and permissions.
+# We don't, as this could break services or applications.
+user=`"${STAT}" -c %u "${file}"`
+group=`"${STAT}" -c %g "${file}"`
+rights=`"${STAT}" -c %a "${file}"`
+
+# Name of author, for log messages.
+if [ -n "${SUDO_USER}" ]; then
+	# Using `sudo'.
+	author="-w${SUDO_USER}"
+elif [ "${USER}" = "root" -a -n "${MAIL}" ]; then
+	# When using `su', some of the user's environment is retained (but not when using `su -' !).
+	# Obviously, we're making a dangerous assumption here (but for me it works).
+	author="-w${MAIL##*/}"
+fi
+
+# Is file under version control?
+# If so, are there any differences?
+diff=`${DIFF} "${file}" 2> /dev/null`
+retval=$?
+# rcsdiff may have 1 of 3 return values:
+# 0 : no differences found
+# 1 : differences found
+# 2 : rcs file or working file not found
+if [ ${retval} -eq 2 ]; then
+	# Initial checkin.
+	echo "File ${file} is not yet under version control."
+	echo "Let's check it in right away."
+	echo "Please give a short (1 line) description of the file."
+	echo "E.g.:"
+	echo " Apache config for virtual host www.example.com"
+	echo "or"
+	echo " Postfix mail aliases for host `hostname`"
+	echo "(This is not the log message!)"
+	read -p "Description: " descr
+	${CI} -i -u ${author} -t-"${descr}" -m"Initial checkin" ${file}
+	"${CHOWN}" "${user}" "${file}"
+	"${CHGRP}" "${group}" "${file}"
+	"${CHMOD}" "${rights}" "${file}"
+elif [ ${retval} -eq 1 ]; then
+	echo "There is a difference between ${file} and the last version in it's RCS file."
+	echo "Please verify and correct this before continuing."
+	echo
+	echo "The approximate steps for correction would be (adjust to system and taste):"
+	echo " mv '${file}' '${file}.changed'"
+	echo " ${CO} -l '${file}'"
+	echo " diff '${file}' '${file}.changed'"
+	echo " # incorporate changes to be kept into '${file}'"
+	echo " ${CI} -u ${author} -m'Checking in old changes.' '${file}'"
+	echo " rm '${file}.changed'"
+	echo "(Do not simply copy the above, but make sure you understand what it does.)"
+	echo
+	echo "After correction, make sure the file attributes for the working file are as follows:"
+	echo "User: ${user}"
+	echo "Group: ${group}"
+	echo "Rights: ${rights}"
+	exit 1
+fi
+
+# We can now safely delete the original (to keep co from complaining).
+"${RM}" -f "${file}" || exit 1
+
+# Checkout and lock.
+${CO} -l "${file}"
+
+# Edit.
+"${EDITOR}" "${file}"
+
+# Compare.
+diff=`${DIFF} -q "${file}"`
+
+if [ -n "${diff}" ]; then
+	# Working file has changed.
+	# Checkin (and checkout again, unlocked).
+	echo "Please give a short (1 line) log message for this change."
+	read -p "Log message: " msg
+	${CI} -u ${author} -m"${msg}" "${file}"
+	echo "New version of ${file} saved."
+else
+	# Working file has not changed.
+	# Remove unchanged locked working file, and checkout unlocked.
+	${CLEAN} -u "${file}"
+	${CO} -u "${file}"
+	echo "Changes to ${file} cancelled."
+fi
+
+# Correct file attributes.
+"${CHOWN}" "${user}" "${file}"
+"${CHGRP}" "${group}" "${file}"
+"${CHMOD}" "${rights}" "${file}"
+
+# Done
