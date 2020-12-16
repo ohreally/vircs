@@ -33,17 +33,17 @@
 ################################################################################
 
 # Dependencies.
-RCS=`which rcs`		|| exit 1
+RCS=`which rcs`		|| { echo "rcs command not found"; exit 1 }
 CI="${RCS} ci"
 CO="${RCS} co"
 DIFF="${RCS} diff"
 CLEAN="${RCS} clean"
-CHGRP=`which chgrp`	|| exit 1
-CHMOD=`which chmod`	|| exit 1
-CHOWN=`which chown`	|| exit 1
-FILE=`which file`	|| exit 1
-RM=`which rm`		|| exit 1
-STAT=`which stat`	|| exit 1
+CHGRP=`which chgrp`	|| { echo "chgrp command not found"; exit 1 }
+CHMOD=`which chmod`	|| { echo "chmod command not found"; exit 1 }
+CHOWN=`which chown`	|| { echo "chown command not found"; exit 1 }
+FILE=`which file`	|| { echo "file command not found"; exit 1 }
+RM=`which rm`		|| { echo "rm command not found"; exit 1 }
+STAT=`which stat`	|| { echo "stat command not found"; exit 1 }
 [ -z "${EDITOR}" ] && {
 	# Real sysadmins use vim. ;)
 	echo "Environment variable EDITOR not set; we'll use vim."
