@@ -105,9 +105,15 @@ mimetype=`"${FILE}" --brief --dereference --mime-type "${file}"`
 
 # RCS ignores file owner, group and permissions.
 # We don't, as this could break services or applications.
-user=`"${STAT}" -c %u "${file}"`
-group=`"${STAT}" -c %g "${file}"`
-rights=`"${STAT}" -c %a "${file}"`
+if [ "`uname`" = "Linux" ]; then
+	user=`"${STAT}" -c %u "${file}"`
+	group=`"${STAT}" -c %g "${file}"`
+	rights=`"${STAT}" -c %a "${file}"`
+else
+	user=`"${STAT}" -f %Su "${file}"`
+	group=`"${STAT}" -f %Sg "${file}"`
+	rights=`"${STAT}" -f %OLp "${file}"`
+fi
 
 # Name of author, for log messages.
 if [ -n "${SUDO_USER}" ]; then
