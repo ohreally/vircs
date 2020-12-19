@@ -118,11 +118,11 @@ fi
 # Name of author, for log messages.
 if [ -n "${SUDO_USER}" ]; then
 	# Using `sudo'.
-	author="-w${SUDO_USER}"
+	author=${SUDO_USER}
 elif [ "${USER}" = "root" -a -n "${MAIL}" ]; then
 	# When using `su', some of the user's environment is retained (but not when using `su -' !).
 	# Obviously, we're making a dangerous assumption here (but for me it works).
-	author="-w${MAIL##*/}"
+	author=${MAIL##*/}
 fi
 
 # Is file under version control?
@@ -144,7 +144,7 @@ if [ ${retval} -eq 2 ]; then
 	echo " Postfix mail aliases for host `hostname`"
 	echo "(This is not the log message!)"
 	read -p "Description: " descr
-	${CI} -i -u ${author} -t-"${descr}" -m"Initial checkin" ${file}
+	${CI} -i -u -w${author} -t-"${descr}" -m"Initial checkin" ${file}
 	"${CHOWN}" "${user}" "${file}"
 	"${CHGRP}" "${group}" "${file}"
 	"${CHMOD}" "${rights}" "${file}"
@@ -157,7 +157,7 @@ elif [ ${retval} -eq 1 ]; then
 	echo " ${CO} -l '${file}'"
 	echo " diff '${file}' '${file}.changed'"
 	echo " # incorporate changes to be kept into '${file}'"
-	echo " ${CI} -u ${author} -m'Checking in old changes.' '${file}'"
+	echo " ${CI} -u -w${author} -m'Checking in old changes.' '${file}'"
 	echo " rm '${file}.changed'"
 	echo "(Do not simply copy the above, but make sure you understand what it does.)"
 	echo
@@ -185,7 +185,7 @@ if [ -n "${diff}" ]; then
 	# Checkin (and checkout again, unlocked).
 	echo "Please give a short (1 line) log message for this change."
 	read -p "Log message: " msg
-	${CI} -u ${author} -m"${msg}" "${file}"
+	${CI} -u -w${author} -m"${msg}" "${file}"
 	echo "New version of ${file} saved."
 else
 	# Working file has not changed.
