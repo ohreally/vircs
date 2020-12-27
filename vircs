@@ -68,7 +68,10 @@ STAT=`which stat` || {
 [ -z "${EDITOR}" ] && {
 	# Real sysadmins use vim. ;)
 	echo "Environment variable EDITOR not set; we'll use vim."
-	EDITOR=`which vim` || exit 1
+	EDITOR=`which vim` || {
+		echo "vim not found"
+		exit 1
+	}
 }
 
 # File to edit.
@@ -123,6 +126,9 @@ elif [ "${USER}" = "root" -a -n "${MAIL}" ]; then
 	# When using `su', some of the user's environment is retained (but not when using `su -' !).
 	# Obviously, we're making a dangerous assumption here (but for me it works).
 	author=${MAIL##*/}
+else
+	# Fall back to ${USER}.
+	author=${USER}
 fi
 
 # Is file under version control?
