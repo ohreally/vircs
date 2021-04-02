@@ -33,6 +33,10 @@
 ################################################################################
 
 # Dependencies.
+DEREF=`which realpath || which readlink` || {
+	echo "realpath or readlink command not found"
+	exit 1
+}
 RCS=`which rcs` || {
 	echo "rcs command not found"
 	exit 1
@@ -80,6 +84,7 @@ file=$@
 	echo "Usage: $0 file"
 	exit 1
 }
+file=$("${DEREF}" "${file}")
 
 # File exists?
 [ ! -e "${file}" ] && {
