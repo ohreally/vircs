@@ -61,6 +61,10 @@ FILE=`which file` || {
 	echo "file command not found"
 	exit 1
 }
+RLOG=`which rlog` || {
+	echo "rlog command not found"
+	exit 1
+}
 RM=`which rm` || {
 	echo "rm command not found"
 	exit 1
@@ -69,6 +73,8 @@ STAT=`which stat` || {
 	echo "stat command not found"
 	exit 1
 }
+
+# Can't do anything without an editor.
 [ -z "${EDITOR}" ] && {
 	# Real sysadmins use vim. ;)
 	echo "Environment variable EDITOR not set; we'll use vim."
@@ -110,6 +116,15 @@ mimetype=`"${FILE}" --brief --dereference --mime-type "${file}"`
 	echo "File ${file} is of type ${mimetype} and cannot be edited by $0."
 	exit 1
 }
+
+# If the file is checked out locked,
+# this command returns the name of the RCS file.
+# If it isn't, the empty string is returned.
+rcsfile=$("${RLOG}" -L -R "${file}")
+if [ "${rcsfile}" = "${file},v" ]; then
+	echo "${file} is locked by RCS. Undo this first."
+	exit 1
+fi
 
 # RCS ignores file owner, group and permissions.
 # We don't, as this could break services or applications.
